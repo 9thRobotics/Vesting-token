@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract VestingToken {
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
+contract VestingToken is Ownable {
+    using SafeMath for uint256;
+
     string public name = "VestingToken";
     string public symbol = "VEST";
     uint8 public decimals = 18;
@@ -20,6 +25,7 @@ contract VestingToken {
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event VestingScheduleSet(address indexed beneficiary, uint256 totalAmount, uint256 releaseInterval, uint256 startTime);
+    event TokensClaimed(address indexed beneficiary, uint256 amount);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not an admin");
@@ -33,8 +39,8 @@ contract VestingToken {
 
     function transfer(address recipient, uint256 amount) public returns (bool) {
         require(balanceOf[msg.sender] >= amount, "Insufficient balance");
-        balanceOf[msg.sender] -= amount;
-        balanceOf[recipient] += amount;
+        balanceOf[msg.sender] = balanceOf[msg.sender].sub(amount);
+        balanceOf[recipient] = balanceOf[recipient].add(amount);
         emit Transfer(msg.sender, recipient, amount);
         return true;
     }
@@ -52,8 +58,8 @@ contract VestingToken {
             releaseInterval: _releaseInterval,
             nextReleaseTime: _startTime
         });
-        balanceOf[admin] -= _totalAmount;
-        balanceOf[address(this)] += _totalAmount;
+        balanceOf[admin] = balanceOf[admin].sub(_totalAmount);
+        balanceOf[address(this)] = balanceOf[address(this)].add(_totalAmount);
         emit VestingScheduleSet(_beneficiary, _totalAmount, _releaseInterval, _startTime);
     }
 
@@ -69,11 +75,12 @@ contract VestingToken {
             : releasable;
 
         require(releasable > 0, "No tokens to release");
-        schedule.releasedAmount += releasable;
-        schedule.nextReleaseTime += schedule.releaseInterval;
+        schedule.releasedAmount = schedule.releasedAmount.add(releasable);
+        schedule.nextReleaseTime = schedule.nextReleaseTime.add(schedule.releaseInterval);
 
-        balanceOf[address(this)] -= releasable;
-        balanceOf[msg.sender] += releasable;
+        balanceOf[address(this)] = balanceOf[address(this)].sub(releasable);
+        balanceOf[msg.sender] = balanceOf[msg.sender].add(releasable);
         emit Transfer(address(this), msg.sender, releasable);
+        emit TokensClaimed(msg.sender, releasable);
     }
 }
